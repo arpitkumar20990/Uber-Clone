@@ -77,3 +77,70 @@ Example:
 **Notes:**  
 - Email and password must match a registered user account.
 - The returned JWT token should be included in subsequent requests for authentication.
+
+
+
+## User Profile Endpoint
+
+### GET /users/profile
+
+**Description:**  
+Retrieves the profile information of the authenticated user. This endpoint requires a valid JWT token for authorization.
+
+**Request Headers:**  
+- `Authorization` (string, required): Bearer token in the format `Bearer <jwt_token>`
+
+**Response:**
+
+- **200 OK:** User profile retrieved successfully
+  - Body: `{ user_object }`
+  - Example:
+    ```json
+    {
+      "_id": "user_id_here",
+      "fullname": {
+        "firstname": "John",
+        "lastname": "Doe"
+      },
+      "email": "john.doe@example.com",
+      "socketId": "socket_id_here"
+    }
+    ```
+
+- **401 Unauthorized:** Invalid or missing token
+  - Body: `{ "message": "Unauthorized" }`
+
+**Notes:**  
+- Requires authentication via JWT token.
+- Returns the complete user object excluding sensitive information like password.
+
+
+
+## User Logout Endpoint
+
+### GET /users/logout
+
+**Description:**  
+Logs out the authenticated user by invalidating their JWT token. The token is added to a blacklist to prevent further use.
+
+**Request Headers:**  
+- `Authorization` (string, required): Bearer token in the format `Bearer <jwt_token>`
+
+**Response:**
+
+- **200 OK:** User logged out successfully
+  - Body: `{ "message": "Logged out" }`
+  - Example:
+    ```json
+    {
+      "message": "Logged out"
+    }
+    ```
+
+- **401 Unauthorized:** Invalid or missing token
+  - Body: `{ "message": "Unauthorized" }`
+
+**Notes:**  
+- Requires authentication via JWT token.
+- Clears the authentication cookie if present.
+- The token is blacklisted and cannot be used for future requests.
