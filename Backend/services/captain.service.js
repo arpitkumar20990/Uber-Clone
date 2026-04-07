@@ -20,3 +20,14 @@ exports.registerCaptain = async ({firstname, lastname, email, password, color, p
     });
     return captain;
 }
+
+exports.loginCaptain = async (email, password) => {
+    if (!email || !password) {
+        throw new Error('Email and password are required');
+    }
+    const captain = await captainModel.findOne({email}).select('+password');
+    if (!captain) {
+        throw new Error('Captain not found');
+    }
+    return captain;
+}

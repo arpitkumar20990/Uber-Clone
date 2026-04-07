@@ -85,34 +85,22 @@ Example:
 ### GET /users/profile
 
 **Description:**  
-Retrieves the profile information of the authenticated user. This endpoint requires a valid JWT token for authorization.
+Retrieves the authenticated user's profile information. This is a protected endpoint that requires a valid JWT token.
 
-**Request Headers:**  
-- `Authorization` (string, required): Bearer token in the format `Bearer <jwt_token>`
+**Authentication:**
+- Required: JWT token in the `Authorization` header (Bearer token) or in the `token` cookie
 
 **Response:**
 
-- **200 OK:** User profile retrieved successfully
-  - Body: `{ user_object }`
-  - Example:
-    ```json
-    {
-      "_id": "user_id_here",
-      "fullname": {
-        "firstname": "John",
-        "lastname": "Doe"
-      },
-      "email": "john.doe@example.com",
-      "socketId": "socket_id_here"
-    }
-    ```
+- **200 OK:** Profile retrieved successfully
+  - Body: `{ "user": { user_object } }`
 
-- **401 Unauthorized:** Invalid or missing token
+- **401 Unauthorized:** Missing or invalid token
   - Body: `{ "message": "Unauthorized" }`
 
 **Notes:**  
-- Requires authentication via JWT token.
-- Returns the complete user object excluding sensitive information like password.
+- This endpoint requires authentication via the authUser middleware.
+- The user object is attached to the request from the authentication middleware.
 
 
 
@@ -121,29 +109,26 @@ Retrieves the profile information of the authenticated user. This endpoint requi
 ### GET /users/logout
 
 **Description:**  
-Logs out the authenticated user by invalidating their JWT token. The token is added to a blacklist to prevent further use.
+Logs out the authenticated user by blacklisting their JWT token and clearing the session cookie. After logout, the token can no longer be used for authentication.
 
-**Request Headers:**  
-- `Authorization` (string, required): Bearer token in the format `Bearer <jwt_token>`
+**Authentication:**
+- Required: JWT token in the `Authorization` header (Bearer token) or in the `token` cookie
 
 **Response:**
 
 - **200 OK:** User logged out successfully
-  - Body: `{ "message": "Logged out" }`
-  - Example:
-    ```json
-    {
-      "message": "Logged out"
-    }
-    ```
+  - Body: `{ "message": "Logged out successfully" }`
 
-- **401 Unauthorized:** Invalid or missing token
+- **401 Unauthorized:** Missing or invalid token
   - Body: `{ "message": "Unauthorized" }`
 
+**Cookies:**
+- The `token` cookie is cleared upon successful logout
+
 **Notes:**  
-- Requires authentication via JWT token.
-- Clears the authentication cookie if present.
-- The token is blacklisted and cannot be used for future requests.
+- This endpoint requires authentication via the authUser middleware.
+- The token is added to the blacklist to prevent reuse.
+- The token cookie is cleared from the client side.
 
 
 
@@ -152,7 +137,7 @@ Logs out the authenticated user by invalidating their JWT token. The token is ad
 ### POST /captains/register
 
 **Description:**  
-Registers a new captain by creating an account with the provided details, including personal information and vehicle details. The endpoint validates the input data and returns a JWT token upon successful registration.
+Registers a new captain by creating an account with the provided details and vehicle information. The endpoint validates the input data and returns a JWT token upon successful registration.
 
 **Request Body:**  
 The request must be in JSON format with the following fields:
@@ -160,25 +145,25 @@ The request must be in JSON format with the following fields:
 - `fullname` (object): Captain's full name
   - `firstname` (string, required): First name, minimum 3 characters
   - `lastname` (string, optional): Last name, minimum 3 characters if provided
-- `email` (string, required): Valid email address, must be unique
+- `email` (string, required): Valid email address
 - `password` (string, required): Password, minimum 6 characters
 - `vehicle` (object): Vehicle information
   - `color` (string, required): Vehicle color, minimum 3 characters
-  - `plate` (string, required): Vehicle plate number, minimum 3 characters
-  - `capacity` (number, required): Vehicle seating capacity, minimum 1
-  - `vehicleType` (string, required): Type of vehicle - must be one of: `car`, `motorcycle`, `auto`
+  - `plate` (string, required): Vehicle plate, minimum 3 characters
+  - `capacity` (number, required): Passenger capacity, minimum 1
+  - `vehicleType` (string, required): Type of vehicle - 'car', 'motorcycle', or 'auto'
 
 Example:
 ```json
 {
   "fullname": {
-    "firstname": "James",
+    "firstname": "Jane",
     "lastname": "Smith"
   },
-  "email": "james.smith@example.com",
+  "email": "jane.smith@example.com",
   "password": "password123",
   "vehicle": {
-    "color": "black",
+    "color": "Black",
     "plate": "ABC123",
     "capacity": 4,
     "vehicleType": "car"
@@ -190,47 +175,103 @@ Example:
 
 - **201 Created:** Captain registered successfully
   - Body: `{ "token": "jwt_token_here", "captain": { captain_object } }`
-  - Captain object includes:
-    ```json
-    {
-      "_id": "captain_id_here",
-      "fullname": {
-        "firstname": "James",
-        "lastname": "Smith"
-      },
-      "email": "james.smith@example.com",
-      "status": "inactive",
-      "vehicle": {
-        "color": "black",
-        "plate": "ABC123",
-        "capacity": 4,
-        "vehicleType": "car"
-      },
-      "location": {
-        "lat": null,
-        "lng": null
-      }
-    }
-    ```
 
 - **400 Bad Request:** Validation errors or captain already exists
-  - Body: `{ "message": "Captain with this email already exists" }` or `{ "errors": [ { "msg": "error_message", ... } ] }`
-
-**Validation Rules:**
-
-| Field | Rule | Error Message |
-|-------|------|---------------|
-| `fullname.firstname` | Minimum 3 characters | "First name must be at least 3 character long" |
-| `email` | Valid email format | "Invalid Email" |
-| `password` | Minimum 6 characters | "password must be 6 character long" |
-| `vehicle.color` | Minimum 3 characters | "Color must be at least 3 character long" |
-| `vehicle.plate` | Minimum 3 characters | "Plate must be at least 3 character long" |
-| `vehicle.capacity` | Integer, minimum 1 | "Capacity must be at least 1" |
-| `vehicle.vehicleType` | One of: car, motorcycle, auto | "Vehicle type must be car, motorcycle or auto" |
+  - Body: `{ "errors": [ { "msg": "error_message", ... } ] }` or `{ "message": "Captain with this email already exists" }`
 
 **Notes:**  
-- Password is hashed using bcrypt before storing.
-- Email must be unique across all captains.
+- Password is hashed before storing.
+- Email must be unique.
+
+
+
+## Captain Login Endpoint
+
+### POST /captains/login
+
+**Description:**  
+Authenticates a captain by verifying their email and password credentials. Upon successful authentication, the endpoint returns a JWT token for subsequent authenticated requests.
+
+**Request Body:**  
+The request must be in JSON format with the following fields:
+
+- `email` (string, required): Valid email address
+- `password` (string, required): Password, minimum 6 characters
+
+Example:
+```json
+{
+  "email": "jane.smith@example.com",
+  "password": "password123"
+}
+```
+
+**Response:**
+
+- **200 OK:** Captain authenticated successfully
+  - Body: `{ "token": "jwt_token_here", "captain": { captain_object } }`
+
+- **401 Unauthorized:** Invalid email or password
+  - Body: `{ "message": "Invalid email or password" }`
+
+- **400 Bad Request:** Validation errors
+  - Body: `{ "errors": [ { "msg": "error_message", ... } ] }`
+
+**Headers:**
+- Token is set in `token` cookie for future requests
+
+**Notes:**  
+- Email and password must match a registered captain account.
 - The returned JWT token should be included in subsequent requests for authentication.
-- Captain status defaults to `inactive` upon registration.
-- Location is initialized with null values and can be updated later.
+
+
+
+## Captain Profile Endpoint
+
+### GET /captains/profile
+
+**Description:**  
+Retrieves the authenticated captain's profile information. This is a protected endpoint that requires a valid JWT token.
+
+**Authentication:**
+- Required: JWT token in the `Authorization` header (Bearer token) or in the `token` cookie
+
+**Response:**
+
+- **200 OK:** Profile retrieved successfully
+  - Body: `{ "captain": { captain_object } }`
+
+- **401 Unauthorized:** Missing or invalid token
+  - Body: `{ "message": "Unauthorized" }`
+
+**Notes:**  
+- This endpoint requires authentication via the authCaptain middleware.
+- The captain object is attached to the request from the authentication middleware.
+
+
+
+## Captain Logout Endpoint
+
+### GET /captains/logout
+
+**Description:**  
+Logs out the authenticated captain by blacklisting their JWT token and clearing the session cookie. After logout, the token can no longer be used for authentication.
+
+**Authentication:**
+- Required: JWT token in the `Authorization` header (Bearer token) or in the `token` cookie
+
+**Response:**
+
+- **200 OK:** Captain logged out successfully
+  - Body: `{ "message": "Logged out successfully" }`
+
+- **401 Unauthorized:** Missing or invalid token
+  - Body: `{ "message": "Unauthorized" }`
+
+**Cookies:**
+- The `token` cookie is cleared upon successful logout
+
+**Notes:**  
+- This endpoint requires authentication via the authCaptain middleware.
+- The token is added to the blacklist to prevent reuse.
+- The token cookie is cleared from the client side.
